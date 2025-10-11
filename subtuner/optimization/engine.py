@@ -116,8 +116,8 @@ class OptimizationEngine:
             raise OptimizationError(f"Optimization failed: {e}") from e
     
     def _apply_optimization_pipeline(
-        self, 
-        subtitles: List[Subtitle], 
+        self,
+        subtitles: List[Subtitle],
         config: OptimizationConfig,
         stats: OptimizationStatistics
     ) -> List[Subtitle]:
@@ -131,6 +131,10 @@ class OptimizationEngine:
         Returns:
             Optimized subtitles
         """
+        # Detect original overlaps to preserve them
+        original_overlaps = self._detect_original_overlaps(subtitles)
+        logger.debug(f"Detected {len(original_overlaps)} original overlaps to preserve")
+        
         current = subtitles.copy()
         
         # Phase 1: Duration Adjustment
@@ -148,12 +152,34 @@ class OptimizationEngine:
         current = self.anticipator.process(current, config, stats)
         logger.debug(f"After anticipation: {len(current)} subtitles")
         
-        # Phase 4: Constraints Validation
+        # Phase 4: Constraints Validation (with overlap preservation)
         logger.debug("Phase 4: Constraints validation")
-        current = self.validator.process(current, config, stats)
+        current = self.validator.process(current, config, stats, allowed_overlaps=original_overlaps)
         logger.debug(f"After validation: {len(current)} subtitles")
         
         return current
+    
+    def _detect_original_overlaps(self, subtitles: List[Subtitle]) -> set:
+        """Detect pairs of subtitles that overlap in original timing
+        
+        Args:
+            subtitles: Original subtitles
+            
+        Returns:
+            Set of (index1, index2) tuples for overlapping pairs
+        """
+        overlaps = set()
+        
+        for i in range(len(subtitles) - 1):
+            current = subtitles[i]
+            next_sub = subtitles[i + 1]
+            
+            # Check if they overlap
+            if current.end_time > next_sub.start_time:
+                overlaps.add((i, i + 1))
+                logger.debug(f"Original overlap detected between subtitle {i} and {i+1}")
+        
+        return overlaps
     
     def analyze_subtitles(
         self, 

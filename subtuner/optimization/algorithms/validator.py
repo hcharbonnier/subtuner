@@ -17,10 +17,11 @@ class ConstraintsValidator:
         self.name = "Constraints Validator"
     
     def process(
-        self, 
-        subtitles: List[Subtitle], 
+        self,
+        subtitles: List[Subtitle],
         config: OptimizationConfig,
-        stats: OptimizationStatistics
+        stats: OptimizationStatistics,
+        allowed_overlaps: set = None
     ) -> List[Subtitle]:
         """Enforce hard constraints across all subtitles
         
@@ -28,6 +29,7 @@ class ConstraintsValidator:
             subtitles: List of subtitles to validate and fix
             config: Optimization configuration
             stats: Statistics tracker
+            allowed_overlaps: Set of (index1, index2) tuples for allowed overlaps
             
         Returns:
             List of validated subtitles with constraints enforced
@@ -35,9 +37,13 @@ class ConstraintsValidator:
         if not subtitles:
             return subtitles
         
-        logger.debug(f"Starting constraints validation for {len(subtitles)} subtitles")
+        if allowed_overlaps is None:
+            allowed_overlaps = set()
         
-        validated = self.validate_and_fix(subtitles, config, stats)
+        logger.debug(f"Starting constraints validation for {len(subtitles)} subtitles")
+        logger.debug(f"Preserving {len(allowed_overlaps)} original overlaps")
+        
+        validated = self.validate_and_fix(subtitles, config, stats, allowed_overlaps)
         
         logger.info(
             f"Constraints validation complete: "
@@ -50,10 +56,11 @@ class ConstraintsValidator:
         return validated
     
     def validate_and_fix(
-        self, 
+        self,
         subtitles: List[Subtitle],
         config: OptimizationConfig,
-        stats: OptimizationStatistics
+        stats: OptimizationStatistics,
+        allowed_overlaps: set
     ) -> List[Subtitle]:
         """Enforce hard constraints on subtitles
         
@@ -61,6 +68,7 @@ class ConstraintsValidator:
             subtitles: List of subtitles to validate
             config: Optimization configuration
             stats: Statistics tracker
+            allowed_overlaps: Set of allowed overlap pairs
             
         Returns:
             List of validated subtitles
@@ -71,9 +79,13 @@ class ConstraintsValidator:
             previous = validated[-1] if validated else None
             next_subtitle = subtitles[i + 1] if i + 1 < len(subtitles) else None
             
+            # Check if overlap with previous is allowed
+            prev_index = len(validated) - 1
+            is_allowed_overlap = (prev_index, i) in allowed_overlaps if prev_index >= 0 else False
+            
             # Apply all constraint fixes
             fixed_subtitle = self.apply_all_fixes(
-                current, previous, next_subtitle, config, stats
+                current, previous, next_subtitle, config, stats, is_allowed_overlap
             )
             
             # Only add if subtitle is still valid
@@ -81,17 +93,30 @@ class ConstraintsValidator:
                 validated.append(fixed_subtitle)
             else:
                 stats.invalid_removed += 1
-                logger.debug(f"Removed invalid subtitle at index {i}")
+                # Log detailed reason for removal
+                if not fixed_subtitle:
+                    logger.warning(f"Removed subtitle at index {i}: Could not be fixed")
+                else:
+                    # Check specific validation failures
+                    if not fixed_subtitle.validate():
+                        logger.warning(f"Removed subtitle at index {i}: Basic validation failed - start:{fixed_subtitle.start_time:.3f}s, end:{fixed_subtitle.end_time:.3f}s, text:'{fixed_subtitle.text[:50]}'")
+                    elif fixed_subtitle.duration < config.min_duration:
+                        logger.warning(f"Removed subtitle at index {i}: Duration too short ({fixed_subtitle.duration:.3f}s < {config.min_duration:.3f}s)")
+                    elif fixed_subtitle.duration > config.max_duration * 2:
+                        logger.warning(f"Removed subtitle at index {i}: Duration too long ({fixed_subtitle.duration:.3f}s > {config.max_duration * 2:.3f}s)")
+                    else:
+                        logger.warning(f"Removed subtitle at index {i}: Other validation failure")
         
         return validated
     
     def apply_all_fixes(
-        self, 
+        self,
         current: Subtitle,
         previous: Optional[Subtitle],
         next_subtitle: Optional[Subtitle],
         config: OptimizationConfig,
-        stats: OptimizationStatistics
+        stats: OptimizationStatistics,
+        is_allowed_overlap: bool = False
     ) -> Optional[Subtitle]:
         """Apply all necessary fixes to a subtitle
         
@@ -101,6 +126,7 @@ class ConstraintsValidator:
             next_subtitle: Next subtitle (for reference)
             config: Optimization configuration
             stats: Statistics tracker
+            is_allowed_overlap: Whether overlap with previous is allowed
             
         Returns:
             Fixed subtitle or None if unfixable
@@ -109,24 +135,23 @@ class ConstraintsValidator:
         
         # Fix 1: Enforce minimum duration
         fixed = self.fix_minimum_duration(fixed, config, stats)
-        if not fixed:
-            return None
         
-        # Fix 2: Enforce minimum gap with previous
-        fixed = self.fix_minimum_gap(fixed, previous, config, stats)
-        if not fixed:
-            return None
+        # Fix 2: Enforce minimum gap with previous (skip if overlap is allowed)
+        if not is_allowed_overlap:
+            fixed = self.fix_minimum_gap(fixed, previous, config, stats)
+        else:
+            logger.debug(f"Preserving allowed overlap with previous subtitle")
         
-        # Fix 3: Ensure chronological order
+        # Fix 3: Ensure chronological order (but don't remove, return original if validation fails)
         if not self.is_chronologically_valid(fixed, previous):
             stats.chronology_fixes += 1
-            logger.debug(f"Chronological order violation detected, skipping subtitle")
-            return None
+            logger.debug(f"Chronological order violation, keeping original timing")
+            return current  # Return original, not fixed version
         
         # Fix 4: Ensure valid time range
         if not self.has_valid_time_range(fixed):
-            logger.debug(f"Invalid time range detected, skipping subtitle")
-            return None
+            logger.debug(f"Invalid time range, keeping original")
+            return current  # Return original
         
         return fixed
     
@@ -161,12 +186,12 @@ class ConstraintsValidator:
         return fixed
     
     def fix_minimum_gap(
-        self, 
+        self,
         current: Subtitle,
         previous: Optional[Subtitle],
         config: OptimizationConfig,
         stats: OptimizationStatistics
-    ) -> Optional[Subtitle]:
+    ) -> Subtitle:
         """Fix gap between current and previous subtitle
         
         Args:
@@ -176,7 +201,7 @@ class ConstraintsValidator:
             stats: Statistics tracker
             
         Returns:
-            Fixed subtitle or None if unfixable
+            Fixed subtitle (always returns a valid subtitle)
         """
         if previous is None:
             return current  # No previous subtitle to check against
@@ -185,6 +210,12 @@ class ConstraintsValidator:
         
         if current_gap >= config.min_gap:
             return current  # Gap is sufficient
+        
+        # Only fix small gaps (< 0.5s)
+        # Larger gaps/overlaps are likely intentional
+        if current_gap < -0.5:  # Significant overlap = likely intentional
+            logger.debug(f"Preserving overlap (gap: {current_gap:.1f}s)")
+            return current
         
         # Shift current subtitle forward to maintain minimum gap
         required_start = previous.end_time + config.min_gap
@@ -261,7 +292,9 @@ class ConstraintsValidator:
         if subtitle.start_time < 0:
             return False
         
-        if subtitle.duration > config.max_duration * 2:  # Allow some flexibility
+        # Be more tolerant with very long subtitles (credits, etc.)
+        # Only remove if duration is truly excessive (> 60 seconds)
+        if subtitle.duration > 60.0:  # Much more lenient threshold
             return False
         
         return True

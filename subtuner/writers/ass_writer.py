@@ -202,13 +202,14 @@ class ASSWriter(AbstractWriter):
         """
         try:
             # Check if we have preserved original event
-            if (subtitle.metadata.get('format') == 'ass' and 
+            if (subtitle.metadata.get('format') == 'ass' and
                 'original_event' in subtitle.metadata):
                 
                 # Use original event as template and update times
                 original = subtitle.metadata['original_event']
                 
-                event = ass.Event(
+                # Create new event by copying from original
+                event = ass.Dialogue(
                     layer=getattr(original, 'layer', 0),
                     start=self._seconds_to_ass_time(subtitle.start_time),
                     end=self._seconds_to_ass_time(subtitle.end_time),
@@ -218,12 +219,11 @@ class ASSWriter(AbstractWriter):
                     margin_r=getattr(original, 'margin_r', 0),
                     margin_v=getattr(original, 'margin_v', 0),
                     effect=getattr(original, 'effect', ''),
-                    text=subtitle.metadata.get('original_text', subtitle.text),
-                    type='Dialogue'
+                    text=subtitle.metadata.get('original_text', subtitle.text)
                 )
             else:
                 # Create new event with default settings
-                event = ass.Event(
+                event = ass.Dialogue(
                     layer=0,
                     start=self._seconds_to_ass_time(subtitle.start_time),
                     end=self._seconds_to_ass_time(subtitle.end_time),
@@ -233,8 +233,7 @@ class ASSWriter(AbstractWriter):
                     margin_r=0,
                     margin_v=0,
                     effect='',
-                    text=subtitle.text,
-                    type='Dialogue'
+                    text=subtitle.text
                 )
             
             return event
@@ -242,20 +241,16 @@ class ASSWriter(AbstractWriter):
         except Exception as e:
             logger.warning(f"Failed to convert subtitle to ASS event: {e}")
             # Create minimal valid event
-            event = ass.Event(
-                layer=0,
-                start=self._seconds_to_ass_time(subtitle.start_time),
-                end=self._seconds_to_ass_time(subtitle.end_time),
-                style='Default',
-                name='',
-                margin_l=0,
-                margin_r=0,
-                margin_v=0,
-                effect='',
-                text=subtitle.text,
-                type='Dialogue'
-            )
-            return event
+            try:
+                event = ass.Dialogue(
+                    start=self._seconds_to_ass_time(subtitle.start_time),
+                    end=self._seconds_to_ass_time(subtitle.end_time),
+                    text=subtitle.text
+                )
+                return event
+            except Exception as fallback_err:
+                logger.error(f"Cannot create ASS event: {fallback_err}")
+                return None
     
     def _seconds_to_ass_time(self, seconds: float):
         """Convert seconds to ASS time (timedelta)

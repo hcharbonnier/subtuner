@@ -388,9 +388,10 @@ class SubTunerCLI:
                         raise SubTunerError(f"No writer available for format {track_info.codec}")
                     
                     output_path = writer.get_output_path(
-                        video_path, 
-                        track_info.index, 
-                        self.config.processing.output_dir
+                        video_path,
+                        track_info.index,
+                        self.config.processing.output_dir,
+                        language=track_info.language
                     )
                     
                     writer.write_safely(optimization_result.subtitles, output_path)

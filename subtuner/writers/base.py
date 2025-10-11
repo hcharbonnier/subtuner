@@ -124,10 +124,11 @@ class AbstractWriter(ABC):
             raise WritingError(f"Failed to write {output_path}: {e}") from e
     
     def get_output_path(
-        self, 
-        video_path: str, 
-        track_index: int, 
-        output_dir: Optional[str] = None
+        self,
+        video_path: str,
+        track_index: int,
+        output_dir: Optional[str] = None,
+        language: Optional[str] = None
     ) -> str:
         """Generate output path for subtitle file
         
@@ -135,6 +136,7 @@ class AbstractWriter(ABC):
             video_path: Original video file path
             track_index: Subtitle track index
             output_dir: Output directory (default: same as video)
+            language: Language code (e.g., 'eng', 'fra')
             
         Returns:
             Output file path
@@ -148,7 +150,12 @@ class AbstractWriter(ABC):
         else:
             output_directory = video_path.parent
         
-        output_filename = f"{base_name}.{track_index}{extension}"
+        # Include language in filename if available
+        if language:
+            output_filename = f"{base_name}.{track_index}.{language}{extension}"
+        else:
+            output_filename = f"{base_name}.{track_index}{extension}"
+        
         return str(output_directory / output_filename)
     
     def backup_existing_file(self, file_path: str) -> Optional[str]:
