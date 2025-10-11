@@ -19,6 +19,11 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.ass
+*.srt
+*.vtt
+*.mkv
+*.mp4
 
 # Virtual Environment
 venv/

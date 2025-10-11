@@ -40,7 +40,7 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
 
 
 @click.command()
-@click.argument('video_paths', nargs=-1, required=True, type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument('input_paths', nargs=-1, required=True, type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.option(
     '--chars-per-sec', 
     default=20.0, 
@@ -122,7 +122,7 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
 )
 @click.version_option(version="0.1.0", prog_name="SubTuner")
 def main(
-    video_paths: tuple,
+    input_paths: tuple,
     chars_per_sec: float,
     max_duration: float,
     min_duration: float,
@@ -138,22 +138,29 @@ def main(
     report_format: str,
     save_report: Optional[str]
 ) -> None:
-    """SubTuner - Optimize embedded video subtitles for better readability.
+    """SubTuner - Optimize video subtitles for better readability.
     
-    SubTuner extracts subtitle tracks from video files and applies intelligent
+    SubTuner can process both video files (extracting embedded subtitles) and
+    standalone subtitle files (.srt, .ass, .ssa, .vtt). It applies intelligent
     optimization algorithms to improve reading experience while preserving
     semantic structure.
     
     Examples:
     
-        # Optimize a single video
+        # Optimize embedded subtitles from a video
         subtuner movie.mkv
         
-        # Batch process multiple videos
-        subtuner movie1.mkv movie2.mp4 series/*.mkv
+        # Optimize a standalone subtitle file
+        subtuner subtitles.srt
+        
+        # Batch process multiple files (videos and subtitles)
+        subtuner movie1.mkv movie2.mp4 subtitles.ass series/*.mkv
         
         # Custom reading speed for slower readers
         subtuner movie.mkv --chars-per-sec 15
+        
+        # Customize output label
+        subtuner subtitles.srt --output-label "optimized"
         
         # Preview changes without writing files
         subtuner movie.mkv --dry-run
@@ -190,20 +197,20 @@ def main(
         cli = SubTunerCLI(config)
         
         # Convert tuple to list and expand directories
-        video_list = cli.expand_video_paths(list(video_paths))
+        input_list = cli.expand_video_paths(list(input_paths))
         
-        if not video_list:
+        if not input_list:
             if not quiet:
-                click.echo("❌ No video files found to process")
+                click.echo("❌ No video or subtitle files found to process")
             sys.exit(1)
         
-        # Process videos
-        if len(video_list) == 1:
-            # Single video processing
-            results = cli.process_single_video(video_list[0])
+        # Process files
+        if len(input_list) == 1:
+            # Single file processing
+            results = cli.process_single_video(input_list[0])
         else:
             # Batch processing
-            results = cli.process_batch_videos(video_list)
+            results = cli.process_batch_videos(input_list)
         
         # Generate and display reports
         report_fmt = ReportFormat(report_format)
@@ -248,72 +255,213 @@ class SubTunerCLI:
         
         self.logger.debug("SubTuner CLI initialized")
     
+    def _is_subtitle_file(self, path: str) -> bool:
+        """Check if a file is a subtitle file
+        
+        Args:
+            path: File path to check
+            
+        Returns:
+            True if file is a subtitle file
+        """
+        subtitle_extensions = {'.srt', '.ass', '.ssa', '.vtt'}
+        return Path(path).suffix.lower() in subtitle_extensions
+    
+    def _is_video_file(self, path: str) -> bool:
+        """Check if a file is a video file
+        
+        Args:
+            path: File path to check
+            
+        Returns:
+            True if file is a video file
+        """
+        video_extensions = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+        return Path(path).suffix.lower() in video_extensions
+    
     def expand_video_paths(self, paths: List[str]) -> List[str]:
-        """Expand directory paths to video files with confirmation
+        """Expand directory paths to video and subtitle files with confirmation
         
         Args:
             paths: List of file or directory paths
             
         Returns:
-            Expanded list of video file paths
+            Expanded list of video and subtitle file paths
         """
         video_extensions = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+        subtitle_extensions = {'.srt', '.ass', '.ssa', '.vtt'}
+        all_extensions = video_extensions | subtitle_extensions
         expanded = []
         
         for path in paths:
             path_obj = Path(path)
             
             if path_obj.is_file():
-                # Add file directly
-                expanded.append(str(path_obj))
+                # Add file directly if it's a video or subtitle
+                if self._is_video_file(str(path_obj)) or self._is_subtitle_file(str(path_obj)):
+                    expanded.append(str(path_obj))
+                else:
+                    self.logger.warning(f"Unsupported file type: {path}")
                 
             elif path_obj.is_dir():
-                # Find all video files in directory
-                video_files = []
-                for ext in video_extensions:
-                    video_files.extend(path_obj.glob(f'*{ext}'))
-                    video_files.extend(path_obj.glob(f'*{ext.upper()}'))
+                # Find all video and subtitle files in directory
+                found_files = []
+                for ext in all_extensions:
+                    found_files.extend(path_obj.glob(f'*{ext}'))
+                    found_files.extend(path_obj.glob(f'*{ext.upper()}'))
                 
-                if video_files:
+                if found_files:
                     # Sort files for consistent ordering
-                    video_files = sorted(set(str(f) for f in video_files))
+                    found_files = sorted(set(str(f) for f in found_files))
                     
                     if not self.config.processing.quiet:
-                        click.echo(f"\n📁 Found {len(video_files)} video file(s) in {path}:")
-                        for i, vf in enumerate(video_files[:10], 1):  # Show first 10
+                        click.echo(f"\n📁 Found {len(found_files)} file(s) in {path}:")
+                        for i, vf in enumerate(found_files[:10], 1):  # Show first 10
                             click.echo(f"  {i}. {Path(vf).name}")
-                        if len(video_files) > 10:
-                            click.echo(f"  ... and {len(video_files) - 10} more")
+                        if len(found_files) > 10:
+                            click.echo(f"  ... and {len(found_files) - 10} more")
                         
                         # Ask for confirmation
-                        if click.confirm(f"\n⚠️  Process all {len(video_files)} video(s)?", default=True):
-                            expanded.extend(video_files)
+                        if click.confirm(f"\n⚠️  Process all {len(found_files)} file(s)?", default=True):
+                            expanded.extend(found_files)
                         else:
                             click.echo("Skipping directory")
                     else:
                         # In quiet mode, process without confirmation
-                        expanded.extend(video_files)
+                        expanded.extend(found_files)
                 else:
                     if not self.config.processing.quiet:
-                        click.echo(f"⚠️  No video files found in {path}")
+                        click.echo(f"⚠️  No video or subtitle files found in {path}")
             else:
                 self.logger.warning(f"Path not found: {path}")
         
         return expanded
     
-    def process_single_video(self, video_path: str) -> dict:
-        """Process a single video file
+    def process_subtitle_file(self, subtitle_path: str) -> dict:
+        """Process a single subtitle file directly
         
         Args:
-            video_path: Path to video file
+            subtitle_path: Path to subtitle file
             
         Returns:
             Dictionary with processing results
         """
-        self.logger.info(f"Processing single video: {Path(video_path).name}")
+        self.logger.info(f"Processing subtitle file: {Path(subtitle_path).name}")
         
         if not self.config.processing.quiet:
-            click.echo(f"\n📹 Processing: {Path(video_path).name}")
+            click.echo(f"\n📝 Processing subtitle: {Path(subtitle_path).name}")
+        
+        try:
+            # Parse subtitles
+            parser = get_parser_for_file(subtitle_path)
+            if not parser:
+                return {
+                    'file_path': subtitle_path,
+                    'status': 'error',
+                    'error': 'No parser available for this subtitle format'
+                }
+            
+            subtitles = parser.parse(subtitle_path)
+            
+            if not subtitles:
+                if not self.config.processing.quiet:
+                    click.echo("⚠️  No subtitles found in file")
+                return {
+                    'file_path': subtitle_path,
+                    'status': 'empty',
+                    'original_count': 0,
+                    'optimized_count': 0
+                }
+            
+            if not self.config.processing.quiet:
+                click.echo(f"📊 Found {len(subtitles)} subtitle entries")
+            
+            # Optimize subtitles
+            optimization_result = self.optimizer.optimize(
+                subtitles,
+                self.config.optimization,
+                track_index=0
+            )
+            
+            # Write optimized subtitles (unless dry run)
+            output_path = None
+            if not self.config.processing.dry_run:
+                # Determine format from file extension
+                file_ext = Path(subtitle_path).suffix.lower()
+                format_name = file_ext[1:]  # Remove the dot
+                
+                writer = get_writer_for_format(format_name)
+                if not writer:
+                    return {
+                        'file_path': subtitle_path,
+                        'status': 'error',
+                        'error': f'No writer available for format {format_name}'
+                    }
+                
+                # Generate output path
+                subtitle_path_obj = Path(subtitle_path)
+                if self.config.processing.output_dir:
+                    output_dir = Path(self.config.processing.output_dir)
+                else:
+                    output_dir = subtitle_path_obj.parent
+                
+                # Build output filename with label
+                base_name = subtitle_path_obj.stem
+                parts = [base_name]
+                
+                if self.config.processing.output_label:
+                    parts.append(self.config.processing.output_label)
+                
+                output_filename = ".".join(parts) + file_ext
+                output_path = str(output_dir / output_filename)
+                
+                writer.write_safely(optimization_result.subtitles, output_path)
+                
+                if not self.config.processing.quiet:
+                    click.echo(f"💾 Saved: {Path(output_path).name}")
+            
+            return {
+                'file_path': subtitle_path,
+                'statistics': optimization_result.statistics,
+                'output_path': output_path,
+                'status': 'success',
+                'original_count': len(subtitles),
+                'optimized_count': len(optimization_result.subtitles)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to process {subtitle_path}: {e}")
+            return {
+                'file_path': subtitle_path,
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    def process_single_video(self, video_path: str) -> dict:
+        """Process a single video or subtitle file
+        
+        Args:
+            video_path: Path to video or subtitle file
+            
+        Returns:
+            Dictionary with processing results
+        """
+        # Check if this is a subtitle file
+        if self._is_subtitle_file(video_path):
+            result = self.process_subtitle_file(video_path)
+            # Wrap result in video-like structure for compatibility
+            return {
+                'video_path': video_path,
+                'tracks': [result] if result.get('status') == 'success' else [],
+                'status': result.get('status', 'error'),
+                'error': result.get('error') if 'error' in result else None
+            }
+        
+        # Original video processing logic
+        self.logger.info(f"Processing video file: {Path(video_path).name}")
+        
+        if not self.config.processing.quiet:
+            click.echo(f"\n📹 Processing video: {Path(video_path).name}")
         
         try:
             # Analyze video for subtitle tracks
