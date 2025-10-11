@@ -42,7 +42,7 @@ pip install subtuner
 
 #### Option 2: From Source
 ```bash
-git clone https://github.com/yourusername/subtuner.git
+git clone https://github.com/hcharbonnier/subtuner
 cd subtuner
 pip install -e .
 ```
@@ -400,7 +400,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ### Setup Development Environment
 
 ```bash
-git clone https://github.com/yourusername/subtuner.git
+git clone https://github.com/hcharbonnier/subtuner
 cd subtuner
 
 # Install with development dependencies
@@ -451,11 +451,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
-## Support
-
-- 🐛 Report bugs: [GitHub Issues](https://github.com/yourusername/subtuner/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/subtuner/discussions)
-- 📧 Email: your.email@example.com
 
 ## Related Projects
 

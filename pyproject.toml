@@ -2,11 +2,11 @@
 name = "subtuner"
 version = "0.1.0"
 description = "Python CLI tool for optimizing embedded video subtitles"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["hcharbonnier <hugues.charbonnier@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/yourusername/subtuner"
-repository = "https://github.com/yourusername/subtuner"
+homepage = "https://github.com/hcharbonnier/subtuner"
+repository = "https://github.com/hcharbonnier/subtuner"
 keywords = ["subtitles", "video", "optimization", "cli"]
 classifiers = [
     "Development Status :: 3 - Alpha",

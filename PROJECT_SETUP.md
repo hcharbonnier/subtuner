@@ -11,11 +11,11 @@ This document provides detailed setup instructions and configuration specificati
 name = "subtuner"
 version = "0.1.0"
 description = "Python CLI tool for optimizing embedded video subtitles"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["hcharbonnier <hugues.charbonnier@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/yourusername/subtuner"
-repository = "https://github.com/yourusername/subtuner"
+homepage = "https://github.com/hcharbonnier/subtuner"
+repository = "https://github.com/hcharbonnier/subtuner"
 keywords = ["subtitles", "video", "optimization", "cli"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -145,12 +145,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="subtuner",
     version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="hcharbonnier",
+    author_email="hugues.charbonnier@gmail.com",
     description="Python CLI tool for optimizing embedded video subtitles",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/subtuner",
+    url="https://github.com/hcharbonnier/subtuner",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -287,7 +287,7 @@ subtuner/
 
 ```bash
 # Clone or initialize repository
-git clone https://github.com/yourusername/subtuner.git
+git clone https://github.com/hcharbonnier/subtuner
 cd subtuner
 
 # Create virtual environment
@@ -416,7 +416,7 @@ exclude =
 ```
 MIT License
 
-Copyright (c) 2024 Your Name
+Copyright (c) 2024 hcharbonnier
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
