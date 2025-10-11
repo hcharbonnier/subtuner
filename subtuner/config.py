@@ -77,6 +77,7 @@ class ProcessingConfig:
     
     # Output settings
     output_dir: Optional[str] = None
+    output_label: str = "fixed"  # Label to add to optimized subtitle files
     dry_run: bool = False
     
     # Processing settings

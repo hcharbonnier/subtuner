@@ -128,7 +128,8 @@ class AbstractWriter(ABC):
         video_path: str,
         track_index: int,
         output_dir: Optional[str] = None,
-        language: Optional[str] = None
+        language: Optional[str] = None,
+        label: Optional[str] = None
     ) -> str:
         """Generate output path for subtitle file
         
@@ -137,6 +138,7 @@ class AbstractWriter(ABC):
             track_index: Subtitle track index
             output_dir: Output directory (default: same as video)
             language: Language code (e.g., 'eng', 'fra')
+            label: Optional label to add to filename (e.g., 'fixed')
             
         Returns:
             Output file path
@@ -150,11 +152,16 @@ class AbstractWriter(ABC):
         else:
             output_directory = video_path.parent
         
-        # Include language in filename if available
+        # Build filename with optional components
+        parts = [base_name, str(track_index)]
+        
         if language:
-            output_filename = f"{base_name}.{track_index}.{language}{extension}"
-        else:
-            output_filename = f"{base_name}.{track_index}{extension}"
+            parts.append(language)
+        
+        if label:
+            parts.append(label)
+        
+        output_filename = ".".join(parts) + extension
         
         return str(output_directory / output_filename)
     

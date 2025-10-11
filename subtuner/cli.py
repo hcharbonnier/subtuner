@@ -40,7 +40,7 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
 
 
 @click.command()
-@click.argument('video_paths', nargs=-1, required=True, type=click.Path(exists=True))
+@click.argument('video_paths', nargs=-1, required=True, type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.option(
     '--chars-per-sec', 
     default=20.0, 
@@ -84,9 +84,15 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     help='Threshold for "long" subtitle in seconds (2-6)'
 )
 @click.option(
-    '--output-dir', 
+    '--output-dir',
     type=click.Path(),
     help='Output directory for optimized subtitles (default: same as input)'
+)
+@click.option(
+    '--output-label',
+    default='fixed',
+    type=str,
+    help='Label to add to optimized subtitle filenames (default: "fixed")'
 )
 @click.option(
     '--dry-run',
@@ -125,6 +131,7 @@ def main(
     short_threshold: float,
     long_threshold: float,
     output_dir: Optional[str],
+    output_label: str,
     dry_run: bool,
     verbose: bool,
     quiet: bool,
@@ -173,6 +180,7 @@ def main(
             short_threshold=short_threshold,
             long_threshold=long_threshold,
             output_dir=output_dir,
+            output_label=output_label,
             dry_run=dry_run,
             verbose=verbose,
             quiet=quiet
@@ -181,8 +189,13 @@ def main(
         # Initialize CLI processor
         cli = SubTunerCLI(config)
         
-        # Convert tuple to list
-        video_list = list(video_paths)
+        # Convert tuple to list and expand directories
+        video_list = cli.expand_video_paths(list(video_paths))
+        
+        if not video_list:
+            if not quiet:
+                click.echo("❌ No video files found to process")
+            sys.exit(1)
         
         # Process videos
         if len(video_list) == 1:
@@ -234,6 +247,59 @@ class SubTunerCLI:
         self.reporter = StatisticsReporter()
         
         self.logger.debug("SubTuner CLI initialized")
+    
+    def expand_video_paths(self, paths: List[str]) -> List[str]:
+        """Expand directory paths to video files with confirmation
+        
+        Args:
+            paths: List of file or directory paths
+            
+        Returns:
+            Expanded list of video file paths
+        """
+        video_extensions = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+        expanded = []
+        
+        for path in paths:
+            path_obj = Path(path)
+            
+            if path_obj.is_file():
+                # Add file directly
+                expanded.append(str(path_obj))
+                
+            elif path_obj.is_dir():
+                # Find all video files in directory
+                video_files = []
+                for ext in video_extensions:
+                    video_files.extend(path_obj.glob(f'*{ext}'))
+                    video_files.extend(path_obj.glob(f'*{ext.upper()}'))
+                
+                if video_files:
+                    # Sort files for consistent ordering
+                    video_files = sorted(set(str(f) for f in video_files))
+                    
+                    if not self.config.processing.quiet:
+                        click.echo(f"\n📁 Found {len(video_files)} video file(s) in {path}:")
+                        for i, vf in enumerate(video_files[:10], 1):  # Show first 10
+                            click.echo(f"  {i}. {Path(vf).name}")
+                        if len(video_files) > 10:
+                            click.echo(f"  ... and {len(video_files) - 10} more")
+                        
+                        # Ask for confirmation
+                        if click.confirm(f"\n⚠️  Process all {len(video_files)} video(s)?", default=True):
+                            expanded.extend(video_files)
+                        else:
+                            click.echo("Skipping directory")
+                    else:
+                        # In quiet mode, process without confirmation
+                        expanded.extend(video_files)
+                else:
+                    if not self.config.processing.quiet:
+                        click.echo(f"⚠️  No video files found in {path}")
+            else:
+                self.logger.warning(f"Path not found: {path}")
+        
+        return expanded
     
     def process_single_video(self, video_path: str) -> dict:
         """Process a single video file
@@ -391,7 +457,8 @@ class SubTunerCLI:
                         video_path,
                         track_info.index,
                         self.config.processing.output_dir,
-                        language=track_info.language
+                        language=track_info.language,
+                        label=self.config.processing.output_label
                     )
                     
                     writer.write_safely(optimization_result.subtitles, output_path)
