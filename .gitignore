@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.coverage.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.mkv
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.webm
+*.m4v
+*.3gp
+
+# Subtitle files (except test fixtures)
+*.srt
+*.vtt
+*.ass
+*.ssa
+*.sub
+*.idx
+!tests/fixtures/*.srt
+!tests/fixtures/*.vtt
+!tests/fixtures/*.ass
+
+# Reports and logs
+*.log
+*_report.*
+optimization_*.json
+batch_report.*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# FFmpeg outputs
+ffmpeg_*.log
+ffprobe_*.log
