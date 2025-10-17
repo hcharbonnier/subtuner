@@ -62,7 +62,10 @@ class ConstraintsValidator:
         stats: OptimizationStatistics,
         allowed_overlaps: set
     ) -> List[Subtitle]:
-        """Enforce hard constraints on subtitles
+        """Apply fixes to subtitles while being conservative about removal
+        
+        Only removes subtitles that fail basic validation (invalid time structure).
+        Keeps subtitles with duration/gap issues but logs warnings.
         
         Args:
             subtitles: List of subtitles to validate
@@ -88,24 +91,22 @@ class ConstraintsValidator:
                 current, previous, next_subtitle, config, stats, is_allowed_overlap
             )
             
-            # Only add if subtitle is still valid
+            # Only remove if basic validation fails
             if fixed_subtitle and self.is_valid_subtitle(fixed_subtitle, config):
+                # Log warnings for problematic subtitles but keep them
+                if fixed_subtitle.duration < config.min_duration:
+                    logger.debug(f"Kept subtitle at index {i} with short duration: {fixed_subtitle.duration:.3f}s < {config.min_duration:.3f}s")
+                elif fixed_subtitle.duration > 60.0:
+                    logger.debug(f"Kept subtitle at index {i} with long duration: {fixed_subtitle.duration:.3f}s")
+                
                 validated.append(fixed_subtitle)
             else:
+                # Only remove if basic validation failed
                 stats.invalid_removed += 1
-                # Log detailed reason for removal
                 if not fixed_subtitle:
                     logger.warning(f"Removed subtitle at index {i}: Could not be fixed")
                 else:
-                    # Check specific validation failures
-                    if not fixed_subtitle.validate():
-                        logger.warning(f"Removed subtitle at index {i}: Basic validation failed - start:{fixed_subtitle.start_time:.3f}s, end:{fixed_subtitle.end_time:.3f}s, text:'{fixed_subtitle.text[:50]}'")
-                    elif fixed_subtitle.duration < config.min_duration:
-                        logger.warning(f"Removed subtitle at index {i}: Duration too short ({fixed_subtitle.duration:.3f}s < {config.min_duration:.3f}s)")
-                    elif fixed_subtitle.duration > config.max_duration * 2:
-                        logger.warning(f"Removed subtitle at index {i}: Duration too long ({fixed_subtitle.duration:.3f}s > {config.max_duration * 2:.3f}s)")
-                    else:
-                        logger.warning(f"Removed subtitle at index {i}: Other validation failure")
+                    logger.warning(f"Removed subtitle at index {i}: Basic validation failed - start:{fixed_subtitle.start_time:.3f}s, end:{fixed_subtitle.end_time:.3f}s, text:'{fixed_subtitle.text[:50]}'")
         
         return validated
     
@@ -267,37 +268,26 @@ class ConstraintsValidator:
         )
     
     def is_valid_subtitle(
-        self, 
+        self,
         subtitle: Subtitle,
         config: OptimizationConfig
     ) -> bool:
-        """Check if subtitle meets all basic validity requirements
+        """Check if subtitle meets basic validity requirements
+        
+        Only checks fundamental validity (positive times, end > start).
+        Does NOT check duration constraints - subtitles with problematic
+        durations are kept but logged as warnings.
         
         Args:
             subtitle: Subtitle to validate
             config: Optimization configuration
             
         Returns:
-            True if subtitle is valid
+            True if subtitle has valid basic structure
         """
-        # Check basic validity
-        if not subtitle.validate():
-            return False
-        
-        # Check minimum duration
-        if subtitle.duration < config.min_duration:
-            return False
-        
-        # Check reasonable bounds
-        if subtitle.start_time < 0:
-            return False
-        
-        # Be more tolerant with very long subtitles (credits, etc.)
-        # Only remove if duration is truly excessive (> 60 seconds)
-        if subtitle.duration > 60.0:  # Much more lenient threshold
-            return False
-        
-        return True
+        # Only check basic structural validity
+        # Keep subtitles even if they have duration/timing issues
+        return subtitle.validate()
     
     def detect_overlaps(self, subtitles: List[Subtitle]) -> List[tuple[int, int]]:
         """Detect overlapping subtitle pairs
@@ -320,12 +310,15 @@ class ConstraintsValidator:
         return overlaps
     
     def fix_overlaps(
-        self, 
+        self,
         subtitles: List[Subtitle],
         config: OptimizationConfig,
         stats: OptimizationStatistics
     ) -> List[Subtitle]:
-        """Fix overlapping subtitles
+        """Fix overlapping subtitles without removing them
+        
+        Attempts to fix overlaps by adjusting timing, but keeps subtitles
+        even if they can't be fixed perfectly.
         
         Args:
             subtitles: List of subtitles with potential overlaps
@@ -333,7 +326,7 @@ class ConstraintsValidator:
             stats: Statistics tracker
             
         Returns:
-            List of subtitles with overlaps fixed
+            List of subtitles with overlaps fixed where possible
         """
         fixed = subtitles.copy()
         overlaps = self.detect_overlaps(fixed)
@@ -351,10 +344,8 @@ class ConstraintsValidator:
                     stats.gap_fixes += 1
                     logger.debug(f"Fixed overlap between subtitles {i} and {j}")
                 else:
-                    # Can't fix without violating minimum duration, remove current
-                    fixed.pop(i)
-                    stats.invalid_removed += 1
-                    logger.debug(f"Removed overlapping subtitle {i}")
+                    # Can't fix without violating minimum duration, keep original
+                    logger.debug(f"Kept overlapping subtitle {i} (can't fix without making it too short)")
         
         return fixed
     
