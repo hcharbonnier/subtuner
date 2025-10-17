@@ -137,14 +137,14 @@ class OptimizationEngine:
         
         current = subtitles.copy()
         
-        # Phase 1: Duration Adjustment
+        # Phase 1: Duration Adjustment (with overlap preservation)
         logger.debug("Phase 1: Duration adjustment")
-        current = self.duration_adjuster.process(current, config, stats)
+        current = self.duration_adjuster.process(current, config, stats, allowed_overlaps=original_overlaps)
         logger.debug(f"After duration adjustment: {len(current)} subtitles")
         
-        # Phase 2: Temporal Rebalancing
+        # Phase 2: Temporal Rebalancing (with overlap preservation)
         logger.debug("Phase 2: Temporal rebalancing")
-        current = self.rebalancer.process(current, config, stats)
+        current = self.rebalancer.process(current, config, stats, allowed_overlaps=original_overlaps)
         logger.debug(f"After rebalancing: {len(current)} subtitles")
         
         # Phase 3: Anticipatory Offset

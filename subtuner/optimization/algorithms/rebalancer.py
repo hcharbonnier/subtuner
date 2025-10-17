@@ -17,10 +17,11 @@ class TemporalRebalancer:
         self.name = "Temporal Rebalancer"
     
     def process(
-        self, 
-        subtitles: List[Subtitle], 
+        self,
+        subtitles: List[Subtitle],
         config: OptimizationConfig,
-        stats: OptimizationStatistics
+        stats: OptimizationStatistics,
+        allowed_overlaps: set = None
     ) -> List[Subtitle]:
         """Apply temporal rebalancing to subtitle pairs
         
@@ -28,6 +29,7 @@ class TemporalRebalancer:
             subtitles: List of subtitles to process
             config: Optimization configuration
             stats: Statistics tracker
+            allowed_overlaps: Set of (index1, index2) tuples for allowed overlaps
             
         Returns:
             List of subtitles with rebalanced timing
@@ -35,7 +37,11 @@ class TemporalRebalancer:
         if len(subtitles) < 2:
             return subtitles
         
+        if allowed_overlaps is None:
+            allowed_overlaps = set()
+        
         logger.debug(f"Starting temporal rebalancing for {len(subtitles)} subtitles")
+        logger.debug(f"Preserving {len(allowed_overlaps)} original overlaps")
         
         rebalanced = subtitles.copy()
         
@@ -43,6 +49,14 @@ class TemporalRebalancer:
         while i < len(rebalanced) - 1:
             current = rebalanced[i]
             next_subtitle = rebalanced[i + 1]
+            
+            # Skip rebalancing if this pair has an allowed overlap
+            is_overlap_allowed = (i, i + 1) in allowed_overlaps
+            
+            if is_overlap_allowed:
+                logger.debug(f"Skipping rebalancing for pair {i}-{i+1} (preserving original overlap)")
+                i += 1
+                continue
             
             new_current, new_next, transferred = self.rebalance_pair(
                 current, next_subtitle, config

@@ -17,10 +17,11 @@ class DurationAdjuster:
         self.name = "Duration Adjuster"
     
     def process(
-        self, 
-        subtitles: List[Subtitle], 
+        self,
+        subtitles: List[Subtitle],
         config: OptimizationConfig,
-        stats: OptimizationStatistics
+        stats: OptimizationStatistics,
+        allowed_overlaps: set = None
     ) -> List[Subtitle]:
         """Apply duration adjustment to all subtitles
         
@@ -28,6 +29,7 @@ class DurationAdjuster:
             subtitles: List of subtitles to process
             config: Optimization configuration
             stats: Statistics tracker
+            allowed_overlaps: Set of (index1, index2) tuples for allowed overlaps
             
         Returns:
             List of subtitles with adjusted durations
@@ -35,13 +37,18 @@ class DurationAdjuster:
         if not subtitles:
             return subtitles
         
+        if allowed_overlaps is None:
+            allowed_overlaps = set()
+        
         logger.debug(f"Starting duration adjustment for {len(subtitles)} subtitles")
+        logger.debug(f"Preserving {len(allowed_overlaps)} original overlaps")
         
         adjusted = []
         
         for i, subtitle in enumerate(subtitles):
             next_subtitle = subtitles[i + 1] if i + 1 < len(subtitles) else None
-            adjusted_subtitle = self.adjust_duration(subtitle, next_subtitle, config)
+            is_overlap_allowed = (i, i + 1) in allowed_overlaps if next_subtitle else False
+            adjusted_subtitle = self.adjust_duration(subtitle, next_subtitle, config, is_overlap_allowed)
             
             # Track changes
             duration_change = adjusted_subtitle.duration - subtitle.duration
@@ -62,10 +69,11 @@ class DurationAdjuster:
         return adjusted
     
     def adjust_duration(
-        self, 
-        current: Subtitle, 
-        next_subtitle: Optional[Subtitle], 
-        config: OptimizationConfig
+        self,
+        current: Subtitle,
+        next_subtitle: Optional[Subtitle],
+        config: OptimizationConfig,
+        is_overlap_allowed: bool = False
     ) -> Subtitle:
         """Adjust subtitle duration based on character count and reading speed
         
@@ -73,6 +81,7 @@ class DurationAdjuster:
             current: Current subtitle to adjust
             next_subtitle: Next subtitle (if exists)
             config: Optimization configuration
+            is_overlap_allowed: Whether overlap with next subtitle is allowed
             
         Returns:
             Subtitle with adjusted duration
@@ -89,9 +98,15 @@ class DurationAdjuster:
         
         # Calculate available time window
         if next_subtitle is not None:
-            # Can extend until min_gap before next subtitle
-            available_end_time = next_subtitle.start_time - config.min_gap
-            max_possible_duration = available_end_time - current.start_time
+            if is_overlap_allowed:
+                # Preserve existing overlap: can extend up to original next.end_time
+                # This allows the overlap to remain as it was
+                max_possible_duration = next_subtitle.end_time - current.start_time
+                logger.debug(f"Allowing overlap with next subtitle (preserving original overlap)")
+            else:
+                # Normal case: respect min_gap
+                available_end_time = next_subtitle.start_time - config.min_gap
+                max_possible_duration = available_end_time - current.start_time
         else:
             # Last subtitle: no constraint from next
             max_possible_duration = float('inf')
