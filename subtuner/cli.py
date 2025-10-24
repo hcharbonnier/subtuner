@@ -125,6 +125,18 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     type=click.Path(),
     help='Save detailed report to file'
 )
+@click.option(
+    '--ass-font-size-adjust',
+    type=int,
+    default=0,
+    help='Adjust font size for dialog subtitles in ASS format (e.g., +2 or -2)'
+)
+@click.option(
+    '--ass-y-position-adjust',
+    type=int,
+    default=0,
+    help='Adjust Y position for dialog subtitles in ASS format (e.g., +100 or -100 pixels)'
+)
 @click.version_option(version="0.1.0", prog_name="SubTuner")
 def main(
     input_paths: tuple,
@@ -142,7 +154,9 @@ def main(
     verbose: bool,
     quiet: bool,
     report_format: str,
-    save_report: Optional[str]
+    save_report: Optional[str],
+    ass_font_size_adjust: int,
+    ass_y_position_adjust: int
 ) -> None:
     """SubTuner - Optimize video subtitles for better readability.
     
@@ -197,7 +211,9 @@ def main(
             output_label=output_label,
             dry_run=dry_run,
             verbose=verbose,
-            quiet=quiet
+            quiet=quiet,
+            ass_font_size_adjust=ass_font_size_adjust,
+            ass_y_position_adjust=ass_y_position_adjust
         )
         
         # Initialize CLI processor
@@ -405,6 +421,13 @@ class SubTunerCLI:
                         'error': f'No writer available for format {format_name}'
                     }
                 
+                # Apply ASS-specific adjustments if this is an ASS file
+                if format_name in ['ass', 'ssa'] and hasattr(writer, 'set_adjustments'):
+                    writer.set_adjustments(
+                        font_size_adjust=self.config.processing.ass_font_size_adjust,
+                        y_position_adjust=self.config.processing.ass_y_position_adjust
+                    )
+                
                 # Generate output path
                 subtitle_path_obj = Path(subtitle_path)
                 if self.config.processing.output_dir:
@@ -607,6 +630,13 @@ class SubTunerCLI:
                     writer = get_writer_for_format(track_info.codec)
                     if not writer:
                         raise SubTunerError(f"No writer available for format {track_info.codec}")
+                    
+                    # Apply ASS-specific adjustments if this is an ASS track
+                    if track_info.codec in ['ass', 'ssa'] and hasattr(writer, 'set_adjustments'):
+                        writer.set_adjustments(
+                            font_size_adjust=self.config.processing.ass_font_size_adjust,
+                            y_position_adjust=self.config.processing.ass_y_position_adjust
+                        )
                     
                     output_path = writer.get_output_path(
                         video_path,

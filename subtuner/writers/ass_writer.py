@@ -1,7 +1,8 @@
 """ASS/SSA subtitle writer"""
 
 import logging
-from typing import List, Any
+from typing import List, Any, Optional
+from collections import Counter
 
 import ass
 
@@ -15,6 +16,12 @@ logger = logging.getLogger(__name__)
 class ASSWriter(AbstractWriter):
     """Writer for ASS/SSA (Advanced SubStation Alpha) subtitle files"""
     
+    def __init__(self):
+        """Initialize ASS writer"""
+        super().__init__()
+        self.font_size_adjust = 0
+        self.y_position_adjust = 0
+    
     @property
     def supported_extensions(self) -> List[str]:
         return ['.ass', '.ssa']
@@ -22,6 +29,17 @@ class ASSWriter(AbstractWriter):
     @property
     def format_name(self) -> str:
         return "ASS (Advanced SubStation Alpha)"
+    
+    def set_adjustments(self, font_size_adjust: int = 0, y_position_adjust: int = 0) -> None:
+        """Set font size and Y position adjustments for dialog subtitles
+        
+        Args:
+            font_size_adjust: Font size adjustment (e.g., +2 or -2)
+            y_position_adjust: Y position adjustment in pixels (e.g., +100 or -100)
+        """
+        self.font_size_adjust = font_size_adjust
+        self.y_position_adjust = y_position_adjust
+        logger.debug(f"ASS adjustments set: font_size={font_size_adjust}, y_position={y_position_adjust}")
     
     def write(
         self, 
@@ -44,6 +62,12 @@ class ASSWriter(AbstractWriter):
             
             # Get original document structure if available
             doc = self._get_or_create_document(subtitles)
+            
+            # Apply adjustments to dialog style if configured
+            if self.font_size_adjust != 0 or self.y_position_adjust != 0:
+                dialog_style_name = self._identify_dialog_style(subtitles)
+                if dialog_style_name:
+                    self._apply_style_adjustments(doc, dialog_style_name)
             
             # Clear existing events and add optimized ones
             doc.events.clear()
@@ -452,3 +476,71 @@ class ASSWriter(AbstractWriter):
                 
         except Exception as e:
             raise WritingError(f"Failed to write ASS file with custom styles: {e}") from e
+    
+    def _identify_dialog_style(self, subtitles: List[Subtitle]) -> Optional[str]:
+        """Identify the most-used style (dialog style) from subtitles
+        
+        Args:
+            subtitles: List of subtitles to analyze
+            
+        Returns:
+            Name of the most-used style, or None if not found
+        """
+        try:
+            # Count style usage
+            style_counter = Counter()
+            
+            for subtitle in subtitles:
+                if subtitle.metadata.get('format') == 'ass':
+                    style_name = subtitle.metadata.get('style', 'Default')
+                    style_counter[style_name] += 1
+            
+            if not style_counter:
+                logger.debug("No ASS styles found in subtitles")
+                return None
+            
+            # Get the most common style
+            most_common_style = style_counter.most_common(1)[0][0]
+            logger.info(f"Identified dialog style: '{most_common_style}' (used {style_counter[most_common_style]} times)")
+            
+            return most_common_style
+            
+        except Exception as e:
+            logger.warning(f"Failed to identify dialog style: {e}")
+            return None
+    
+    def _apply_style_adjustments(self, doc: Any, style_name: str) -> None:
+        """Apply font size and Y position adjustments to a specific style
+        
+        Args:
+            doc: ASS document
+            style_name: Name of the style to adjust
+        """
+        try:
+            # Find the style in the document
+            target_style = None
+            for style in doc.styles:
+                if style.name == style_name:
+                    target_style = style
+                    break
+            
+            if not target_style:
+                logger.warning(f"Style '{style_name}' not found in document")
+                return
+            
+            # Apply font size adjustment
+            if self.font_size_adjust != 0:
+                original_size = target_style.fontsize
+                new_size = max(1, original_size + self.font_size_adjust)  # Ensure minimum size of 1
+                target_style.fontsize = new_size
+                logger.info(f"Adjusted font size for style '{style_name}': {original_size} -> {new_size}")
+            
+            # Apply Y position adjustment (margin_v)
+            if self.y_position_adjust != 0:
+                original_margin = target_style.margin_v
+                new_margin = max(0, original_margin + self.y_position_adjust)  # Ensure non-negative
+                target_style.margin_v = new_margin
+                logger.info(f"Adjusted Y position for style '{style_name}': {original_margin} -> {new_margin}")
+                
+        except Exception as e:
+            logger.warning(f"Failed to apply style adjustments: {e}")

@@ -15,6 +15,7 @@ A powerful Python CLI tool for optimizing embedded subtitles in video files (MKV
 - Extracts all text subtitle tracks from video files
 - Supports SRT, WebVTT, and ASS/SSA formats
 - Preserves original formatting and styles
+- **ASS-specific adjustments**: Font size and Y position for dialog subtitles
 - Handles corrupted files and encoding issues gracefully
 
 📊 **Detailed Statistics**
@@ -146,6 +147,33 @@ Disable anticipation entirely:
 subtuner movie.mkv --max-anticipation 0
 ```
 
+### ASS Subtitle Adjustments
+
+Adjust font size for dialog subtitles in ASS files:
+```bash
+# Increase font size by 2 points
+subtuner subtitles.ass --ass-font-size-adjust 2
+
+# Decrease font size by 2 points
+subtuner subtitles.ass --ass-font-size-adjust -2
+```
+
+Adjust Y position (vertical positioning) for dialog subtitles:
+```bash
+# Move subtitles up by 100 pixels
+subtuner subtitles.ass --ass-y-position-adjust -100
+
+# Move subtitles down by 100 pixels
+subtuner subtitles.ass --ass-y-position-adjust 100
+```
+
+Combine both adjustments:
+```bash
+subtuner anime.ass --ass-font-size-adjust 2 --ass-y-position-adjust -50
+```
+
+See [ASS_ADJUSTMENTS.md](ASS_ADJUSTMENTS.md) for detailed documentation.
+
 ### Disable Duplicate Merging
 
 By default, SubTuner merges overlapping and identical subtitles. To disable this:
@@ -228,6 +256,14 @@ Options:
   --merge-duplicates / --no-merge-duplicates
                           Merge overlapping and identical subtitles
                           [default: enabled]
+  
+  --ass-font-size-adjust INTEGER
+                          Adjust font size for dialog subtitles in ASS format
+                          (e.g., +2 or -2) [default: 0]
+  
+  --ass-y-position-adjust INTEGER
+                          Adjust Y position for dialog subtitles in ASS format
+                          (e.g., +100 or -100 pixels) [default: 0]
   
   --output-dir PATH       Output directory for optimized subtitles
                           [default: same as input file]

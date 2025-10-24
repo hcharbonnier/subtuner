@@ -93,6 +93,10 @@ class ProcessingConfig:
     ffprobe_path: Optional[str] = None
     temp_dir: Optional[str] = None
     
+    # ASS-specific adjustments
+    ass_font_size_adjust: int = 0  # Font size adjustment for dialog subtitles (e.g., +2 or -2)
+    ass_y_position_adjust: int = 0  # Y position adjustment for dialog subtitles (e.g., +100 or -100 pixels)
+    
     def __post_init__(self):
         """Validate processing configuration"""
         if self.verbose and self.quiet:
