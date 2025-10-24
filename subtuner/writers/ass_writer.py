@@ -64,10 +64,17 @@ class ASSWriter(AbstractWriter):
             doc = self._get_or_create_document(subtitles)
             
             # Apply adjustments to dialog style if configured
+            dialog_style_name = None
             if self.font_size_adjust != 0 or self.y_position_adjust != 0:
                 dialog_style_name = self._identify_dialog_style(subtitles)
                 if dialog_style_name:
                     self._apply_style_adjustments(doc, dialog_style_name)
+                    # Mark subtitles that use the dialog style
+                    for subtitle in subtitles:
+                        if subtitle.metadata.get('format') == 'ass':
+                            style = subtitle.metadata.get('style', 'Default')
+                            if style == dialog_style_name:
+                                subtitle.metadata['is_dialog_style'] = True
             
             # Clear existing events and add optimized ones
             doc.events.clear()
@@ -232,16 +239,27 @@ class ASSWriter(AbstractWriter):
                 # Use original event as template and update times
                 original = subtitle.metadata['original_event']
                 
+                # Get original margin_v, but apply adjustment if this is a dialog subtitle
+                margin_v = getattr(original, 'margin_v', 0)
+                
+                # If Y position adjustment is configured and this event uses the dialog style,
+                # apply the adjustment to the event's margin_v as well
+                if self.y_position_adjust != 0:
+                    style_name = getattr(original, 'style', 'Default')
+                    # Check if this is the dialog style by checking metadata
+                    if subtitle.metadata.get('is_dialog_style', False):
+                        margin_v = margin_v - self.y_position_adjust
+                
                 # Create new event by copying from original
                 event = ass.Dialogue(
                     layer=getattr(original, 'layer', 0),
                     start=self._seconds_to_ass_time(subtitle.start_time),
                     end=self._seconds_to_ass_time(subtitle.end_time),
-                    style=getattr(original, 'style', 'Default'),
+                    style=style_name,
                     name=getattr(original, 'name', ''),
                     margin_l=getattr(original, 'margin_l', 0),
                     margin_r=getattr(original, 'margin_r', 0),
-                    margin_v=getattr(original, 'margin_v', 0),
+                    margin_v=margin_v,
                     effect=getattr(original, 'effect', ''),
                     text=subtitle.metadata.get('original_text', subtitle.text)
                 )
