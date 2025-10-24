@@ -409,6 +409,19 @@ Balanced settings for documentaries:
 subtuner documentary.mkv --chars-per-sec 18 --long-threshold 5.0
 ```
 
+### 5. ASS Subtitle Customization
+Adjust font size and position for better readability on different screen sizes:
+```bash
+# For 4K displays - increase font size and move subtitles up
+subtuner anime.mkv --ass-font-size-adjust 4 --ass-y-position-adjust -150
+
+# For projectors - larger font and higher position
+subtuner movie.mkv --ass-font-size-adjust 6 --ass-y-position-adjust -200
+
+# Combined with optimization for slower reading
+subtuner series.mkv --chars-per-sec 16 --ass-font-size-adjust 3 --ass-y-position-adjust -100
+```
+
 ## Limitations
 
 - **Text Subtitles Only**: Does not process image-based subtitles (PGS, VobSub)
