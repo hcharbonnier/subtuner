@@ -78,10 +78,15 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     help='Threshold for "short" subtitle in seconds (0.5-1.5)'
 )
 @click.option(
-    '--long-threshold', 
-    default=3.0, 
+    '--long-threshold',
+    default=3.0,
     type=click.FloatRange(2.0, 6.0),
     help='Threshold for "long" subtitle in seconds (2-6)'
+)
+@click.option(
+    '--merge-duplicates/--no-merge-duplicates',
+    default=True,
+    help='Merge overlapping and identical subtitles (default: enabled)'
 )
 @click.option(
     '--output-dir',
@@ -130,6 +135,7 @@ def main(
     max_anticipation: float,
     short_threshold: float,
     long_threshold: float,
+    merge_duplicates: bool,
     output_dir: Optional[str],
     output_label: str,
     dry_run: bool,
@@ -186,6 +192,7 @@ def main(
             max_anticipation=max_anticipation,
             short_threshold=short_threshold,
             long_threshold=long_threshold,
+            merge_duplicates=merge_duplicates,
             output_dir=output_dir,
             output_label=output_label,
             dry_run=dry_run,

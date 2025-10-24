@@ -5,6 +5,7 @@ A powerful Python CLI tool for optimizing embedded subtitles in video files (MKV
 ## Features
 
 ✨ **Smart Optimization**
+- **Duplicate Merging**: Automatically merges overlapping and identical subtitles (enabled by default)
 - **Duration Adjustment**: Automatically calculates optimal display duration based on reading speed (default: 20 chars/sec)
 - **Temporal Rebalancing**: Transfers time from long subtitles to short ones for balanced viewing
 - **Anticipatory Display**: Shows subtitles slightly earlier when beneficial
@@ -145,6 +146,13 @@ Disable anticipation entirely:
 subtuner movie.mkv --max-anticipation 0
 ```
 
+### Disable Duplicate Merging
+
+By default, SubTuner merges overlapping and identical subtitles. To disable this:
+```bash
+subtuner movie.mkv --no-merge-duplicates
+```
+
 ### Adjust Rebalancing Thresholds
 
 Define what counts as "short" and "long" subtitles:
@@ -217,6 +225,10 @@ Options:
   --long-threshold FLOAT  Threshold for "long" subtitle in seconds
                           [default: 3.0, range: 2-6]
   
+  --merge-duplicates / --no-merge-duplicates
+                          Merge overlapping and identical subtitles
+                          [default: enabled]
+  
   --output-dir PATH       Output directory for optimized subtitles
                           [default: same as input file]
   
@@ -276,7 +288,17 @@ Output: movie.0.srt (saved)
 
 ## Optimization Algorithms
 
-SubTuner applies four complementary algorithms:
+SubTuner applies five complementary algorithms in sequence:
+
+### 0. Subtitle Merging (Pre-processing)
+Intelligently merges overlapping and identical subtitles:
+- Detects identical text appearing in consecutive subtitles
+- Merges subtitles that overlap significantly (>50% of shorter duration)
+- Handles text continuations (when one subtitle continues another)
+- Combines time ranges (earliest start, latest end)
+- Preserves formatting and metadata from first subtitle
+
+This phase runs before other optimizations to clean up duplicate content.
 
 ### 1. Duration Adjustment
 Calculates optimal display time based on reading speed:
@@ -301,7 +323,7 @@ Starts subtitles earlier to increase reading time:
 Enforces hard constraints:
 - Minimum display time: 1.0s
 - Minimum gap: 0.05s
-- No overlaps or reversed timestamps
+- No overlaps or reversed timestamps (except intentional overlaps preserved from original)
 - Chronological order
 
 See [ALGORITHMS.md](ALGORITHMS.md) for detailed specifications.

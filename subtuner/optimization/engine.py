@@ -7,6 +7,7 @@ from typing import List
 from ..config import OptimizationConfig
 from ..errors import OptimizationError
 from ..parsers.base import Subtitle
+from .algorithms.merger import SubtitleMerger
 from .algorithms.duration_adjuster import DurationAdjuster
 from .algorithms.rebalancer import TemporalRebalancer
 from .algorithms.anticipator import AnticipationAdjuster
@@ -47,6 +48,7 @@ class OptimizationEngine:
     
     def __init__(self):
         """Initialize the optimization engine"""
+        self.merger = SubtitleMerger()
         self.duration_adjuster = DurationAdjuster()
         self.rebalancer = TemporalRebalancer()
         self.anticipator = AnticipationAdjuster()
@@ -131,11 +133,16 @@ class OptimizationEngine:
         Returns:
             Optimized subtitles
         """
-        # Detect original overlaps to preserve them
-        original_overlaps = self._detect_original_overlaps(subtitles)
-        logger.debug(f"Detected {len(original_overlaps)} original overlaps to preserve")
-        
         current = subtitles.copy()
+        
+        # Phase 0: Merge overlapping and identical subtitles (pre-processing)
+        logger.debug("Phase 0: Subtitle merging")
+        current = self.merger.process(current, config, stats)
+        logger.debug(f"After merging: {len(current)} subtitles")
+        
+        # Detect original overlaps to preserve them (after merging)
+        original_overlaps = self._detect_original_overlaps(current)
+        logger.debug(f"Detected {len(original_overlaps)} original overlaps to preserve")
         
         # Phase 1: Duration Adjustment (with overlap preservation)
         logger.debug("Phase 1: Duration adjustment")
@@ -363,6 +370,11 @@ class OptimizationEngine:
         """
         return {
             'algorithms': [
+                {
+                    'name': self.merger.name,
+                    'phase': 0,
+                    'description': 'Merges overlapping and identical subtitles'
+                },
                 {
                     'name': self.duration_adjuster.name,
                     'phase': 1,

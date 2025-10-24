@@ -27,6 +27,9 @@ class OptimizationConfig:
     # Anticipation
     max_anticipation: float = 0.5
     
+    # Merging
+    merge_duplicates: bool = True
+    
     def __post_init__(self):
         """Validate configuration parameters"""
         self.validate()
@@ -120,7 +123,7 @@ class GlobalConfig:
         
         optimization_fields = {
             'chars_per_sec', 'max_duration', 'min_duration', 'min_gap',
-            'short_threshold', 'long_threshold', 'max_anticipation'
+            'short_threshold', 'long_threshold', 'max_anticipation', 'merge_duplicates'
         }
         
         for key, value in kwargs.items():

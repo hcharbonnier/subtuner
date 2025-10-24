@@ -14,6 +14,9 @@ class OptimizationStatistics:
     original_subtitle_count: int = 0
     final_subtitle_count: int = 0
     
+    # Merging
+    merged_subtitles: int = 0
+    
     # Duration adjustments
     duration_adjustments: int = 0
     total_duration_change: float = 0.0
@@ -87,6 +90,7 @@ class OptimizationStatistics:
     def total_modifications(self) -> int:
         """Calculate total number of modifications made"""
         return (
+            self.merged_subtitles +
             self.duration_adjustments +
             self.rebalanced_pairs +
             self.anticipated_subtitles +
@@ -110,6 +114,7 @@ class OptimizationStatistics:
             'processing_time': round(self.processing_time, 3),
             'total_modifications': self.total_modifications,
             'modification_percentage': round(self.modification_percentage, 1),
+            'merged_subtitles': self.merged_subtitles,
             'duration_adjustments': self.duration_adjustments,
             'avg_duration_change': round(self.avg_duration_change, 3),
             'rebalanced_pairs': self.rebalanced_pairs,
@@ -131,6 +136,8 @@ class OptimizationStatistics:
             f"  Original Subtitles: {self.original_subtitle_count:,}",
             f"  Final Subtitles: {self.final_subtitle_count:,}",
             f"  Processing Time: {self.processing_time:.2f}s",
+            f"",
+            f"  Merged Subtitles: {self.merged_subtitles:,}",
             f"",
             f"  Duration Adjustments: {self.duration_adjustments:,} ({self.duration_adjustments/self.original_subtitle_count*100:.1f}%)" if self.original_subtitle_count > 0 else f"  Duration Adjustments: {self.duration_adjustments:,}",
             f"    Average Change: {self.avg_duration_change:+.3f}s",
