@@ -11,11 +11,17 @@ A powerful Python CLI tool for optimizing embedded subtitles in video files (MKV
 - **Anticipatory Display**: Shows subtitles slightly earlier when beneficial
 - **Strict Constraints**: Ensures minimum display times and gaps between subtitles
 
+🎨 **ASS Subtitle Customization**
+- **Font Size Adjustment**: Increase or decrease dialog subtitle font size (e.g., +2 or -2 points)
+- **Y Position Adjustment**: Move dialog subtitles up or down (e.g., -100 pixels to move up)
+- **Smart Dialog Detection**: Automatically identifies and adjusts only the most-used style (dialog)
+- **Style Preservation**: Other styles (signs, songs, etc.) remain unchanged
+- **Dual-Level Application**: Adjusts both style definitions and individual events for consistent results
+
 🎯 **Robust Processing**
 - Extracts all text subtitle tracks from video files
 - Supports SRT, WebVTT, and ASS/SSA formats
 - Preserves original formatting and styles
-- **ASS-specific adjustments**: Font size and Y position for dialog subtitles
 - Handles corrupted files and encoding issues gracefully
 
 📊 **Detailed Statistics**
