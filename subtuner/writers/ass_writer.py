@@ -536,11 +536,14 @@ class ASSWriter(AbstractWriter):
                 logger.info(f"Adjusted font size for style '{style_name}': {original_size} -> {new_size}")
             
             # Apply Y position adjustment (margin_v)
+            # Note: In ASS, margin_v is the distance from the bottom of the screen
+            # Negative values move subtitles up, positive values move them down
             if self.y_position_adjust != 0:
                 original_margin = target_style.margin_v
-                new_margin = max(0, original_margin + self.y_position_adjust)  # Ensure non-negative
+                new_margin = original_margin - self.y_position_adjust  # Subtract because margin_v is from bottom
+                # Allow negative margin_v as it's valid in ASS (moves subtitles up beyond normal position)
                 target_style.margin_v = new_margin
-                logger.info(f"Adjusted Y position for style '{style_name}': {original_margin} -> {new_margin}")
+                logger.info(f"Adjusted Y position for style '{style_name}': {original_margin} -> {new_margin} (adjustment: {self.y_position_adjust})")
                 
         except Exception as e:
             logger.warning(f"Failed to apply style adjustments: {e}")

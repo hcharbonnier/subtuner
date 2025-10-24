@@ -29,12 +29,16 @@ Adjust the vertical position of dialog subtitles by a specified number of pixels
 
 **CLI Option:** `--ass-y-position-adjust`
 
+**Important:** In ASS format, the `margin_v` property measures distance from the **bottom** of the screen. The adjustment works as follows:
+- **Negative values** (e.g., `-100`) move subtitles **UP** (away from bottom)
+- **Positive values** (e.g., `+100`) move subtitles **DOWN** (closer to bottom)
+
 **Example:**
 ```bash
-# Move subtitles up by 100 pixels
+# Move subtitles up by 100 pixels (away from bottom edge)
 subtuner subtitles.ass --ass-y-position-adjust -100
 
-# Move subtitles down by 100 pixels
+# Move subtitles down by 100 pixels (closer to bottom edge)
 subtuner subtitles.ass --ass-y-position-adjust 100
 ```
 
@@ -66,9 +70,13 @@ The system automatically identifies the "dialog style" by analyzing which style 
 ### Y Position Adjustment
 
 - Modifies the `margin_v` (vertical margin) property of the identified dialog style
-- Positive values move subtitles down, negative values move them up
-- Ensures the resulting margin is non-negative (minimum 0)
-- Original: `margin_v = 10` → With `+100`: `margin_v = 110`
+- `margin_v` in ASS represents the distance from the **bottom** of the screen
+- The adjustment is **subtracted** from `margin_v` to match intuitive expectations:
+  - Negative adjustment values → Move subtitles UP (increase distance from bottom)
+  - Positive adjustment values → Move subtitles DOWN (decrease distance from bottom)
+- Allows negative `margin_v` values (valid in ASS for positioning above normal area)
+- Example: `margin_v = 10` with adjustment `-100` → `margin_v = 110` (moved up)
+- Example: `margin_v = 10` with adjustment `+100` → `margin_v = -90` (moved down)
 
 ## Implementation Details
 
@@ -116,7 +124,7 @@ This increases the dialog font size by 3 points, making subtitles easier to read
 subtuner "anime.ass" --ass-y-position-adjust -80
 ```
 
-This moves dialog subtitles up by 80 pixels, useful when the original position overlaps with on-screen text or important visual elements.
+This moves dialog subtitles up by 80 pixels (increases distance from bottom edge), useful when the original position overlaps with on-screen text or important visual elements.
 
 ### Example 3: Combined Optimization with Adjustments
 
@@ -157,7 +165,7 @@ The implementation includes detailed logging:
 
 2. **ASS/SSA Only**: These adjustments only work with ASS and SSA format files. SRT and VTT formats don't support style-based adjustments.
 
-3. **Margin-Based Positioning**: Y position adjustment uses the `margin_v` property, which may interact with other positioning properties in complex ASS files.
+3. **Margin-Based Positioning**: Y position adjustment uses the `margin_v` property (distance from bottom). This may interact with other positioning properties or per-event overrides in complex ASS files.
 
 ## Future Enhancements
 
