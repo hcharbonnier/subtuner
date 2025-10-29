@@ -81,6 +81,7 @@ class ProcessingConfig:
     # Output settings
     output_dir: Optional[str] = None
     output_label: str = "fixed"  # Label to add to optimized subtitle files
+    force: bool = False  # Overwrite existing files
     dry_run: bool = False
     
     # Processing settings

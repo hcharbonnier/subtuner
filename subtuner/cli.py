@@ -100,6 +100,11 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     help='Label to add to optimized subtitle filenames (default: "fixed")'
 )
 @click.option(
+    '--force',
+    is_flag=True,
+    help='Overwrite existing subtitle files (default: skip existing files)'
+)
+@click.option(
     '--dry-run',
     is_flag=True,
     help='Preview changes without writing files'
@@ -150,6 +155,7 @@ def main(
     merge_duplicates: bool,
     output_dir: Optional[str],
     output_label: str,
+    force: bool,
     dry_run: bool,
     verbose: bool,
     quiet: bool,
@@ -209,6 +215,7 @@ def main(
             merge_duplicates=merge_duplicates,
             output_dir=output_dir,
             output_label=output_label,
+            force=force,
             dry_run=dry_run,
             verbose=verbose,
             quiet=quiet,
@@ -315,6 +322,7 @@ class SubTunerCLI:
         subtitle_extensions = {'.srt', '.ass', '.ssa', '.vtt'}
         all_extensions = video_extensions | subtitle_extensions
         expanded = []
+        explicitly_provided_files = []
         
         for path in paths:
             path_obj = Path(path)
@@ -322,7 +330,7 @@ class SubTunerCLI:
             if path_obj.is_file():
                 # Add file directly if it's a video or subtitle
                 if self._is_video_file(str(path_obj)) or self._is_subtitle_file(str(path_obj)):
-                    expanded.append(str(path_obj))
+                    explicitly_provided_files.append(str(path_obj))
                 else:
                     self.logger.warning(f"Unsupported file type: {path}")
                 
@@ -357,6 +365,27 @@ class SubTunerCLI:
                         click.echo(f"⚠️  No video or subtitle files found in {path}")
             else:
                 self.logger.warning(f"Path not found: {path}")
+        
+        # Handle multiple explicitly provided files with confirmation
+        if len(explicitly_provided_files) > 1:
+            if not self.config.processing.quiet:
+                click.echo(f"\n📄 Found {len(explicitly_provided_files)} file(s) specified:")
+                for i, file_path in enumerate(explicitly_provided_files[:10], 1):  # Show first 10
+                    click.echo(f"  {i}. {Path(file_path).name}")
+                if len(explicitly_provided_files) > 10:
+                    click.echo(f"  ... and {len(explicitly_provided_files) - 10} more")
+                
+                # Ask for confirmation
+                if click.confirm(f"\n⚠️  Process all {len(explicitly_provided_files)} file(s)?", default=True):
+                    expanded.extend(explicitly_provided_files)
+                else:
+                    click.echo("Operation cancelled")
+            else:
+                # In quiet mode, process without confirmation
+                expanded.extend(explicitly_provided_files)
+        else:
+            # Single file or no files - add without confirmation
+            expanded.extend(explicitly_provided_files)
         
         return expanded
     
@@ -444,6 +473,18 @@ class SubTunerCLI:
                 
                 output_filename = ".".join(parts) + file_ext
                 output_path = str(output_dir / output_filename)
+                
+                # Check if file exists and force is not set
+                if os.path.exists(output_path) and not self.config.processing.force:
+                    if not self.config.processing.quiet:
+                        click.echo(f"⏭️  Skipped: {Path(output_path).name} (already exists, use --force to overwrite)")
+                    return {
+                        'file_path': subtitle_path,
+                        'status': 'skipped',
+                        'output_path': output_path,
+                        'original_count': len(subtitles),
+                        'optimized_count': len(optimization_result.subtitles)
+                    }
                 
                 writer.write_safely(optimization_result.subtitles, output_path)
                 
@@ -553,6 +594,7 @@ class SubTunerCLI:
         batch_results = {}
         successful = 0
         failed = 0
+        skipped = 0
         
         for i, video_path in enumerate(video_paths, 1):
             if not self.config.processing.quiet:
@@ -560,9 +602,15 @@ class SubTunerCLI:
             
             try:
                 result = self.process_single_video(video_path)
-                batch_results[video_path] = result.get('tracks', [])
+                tracks = result.get('tracks', [])
+                batch_results[video_path] = tracks
+                
+                # Check if any tracks were skipped
+                has_skipped = any(t.get('status') == 'skipped' for t in tracks)
                 
                 if result['status'] == 'success':
+                    if has_skipped:
+                        skipped += sum(1 for t in tracks if t.get('status') == 'skipped')
                     successful += 1
                 else:
                     failed += 1
@@ -575,7 +623,12 @@ class SubTunerCLI:
         self.reporter.end_session()
         
         if not self.config.processing.quiet:
-            click.echo(f"\n📊 Batch complete: {successful} successful, {failed} failed")
+            summary_parts = [f"{successful} successful"]
+            if skipped > 0:
+                summary_parts.append(f"{skipped} skipped")
+            if failed > 0:
+                summary_parts.append(f"{failed} failed")
+            click.echo(f"\n📊 Batch complete: {', '.join(summary_parts)}")
         
         return {
             'type': 'batch',
@@ -583,6 +636,7 @@ class SubTunerCLI:
             'summary': {
                 'total': len(video_paths),
                 'successful': successful,
+                'skipped': skipped,
                 'failed': failed
             }
         }
@@ -645,6 +699,19 @@ class SubTunerCLI:
                         language=track_info.language,
                         label=self.config.processing.output_label
                     )
+                    
+                    # Check if file exists and force is not set
+                    if os.path.exists(output_path) and not self.config.processing.force:
+                        if not self.config.processing.quiet:
+                            click.echo(f"⏭️  Skipped: {Path(output_path).name} (already exists, use --force to overwrite)")
+                        return {
+                            'track_index': track_info.index,
+                            'track_info': track_info,
+                            'status': 'skipped',
+                            'output_path': output_path,
+                            'original_count': len(subtitles),
+                            'optimized_count': len(optimization_result.subtitles)
+                        }
                     
                     writer.write_safely(optimization_result.subtitles, output_path)
                     
